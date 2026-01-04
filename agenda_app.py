@@ -1,105 +1,87 @@
 import streamlit as st
-import pandas as pd
 import datetime
+import time
 import feedparser
-import json
-import os
+import pandas as pd
 
-# --- ΡΥΘΜΙΣΕΙΣ & ΑΠΟΘΗΚΕΥΣΗ ---
-DB_FILE = "agenda_data.json"
+# --- ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
+st.set_page_config(page_title="Smart Agenda Pro", layout="wide")
 
-def load_data():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
-
-def save_data(data):
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
+# Αρχικοποίηση session state για τα ραντεβού
 if 'appointments' not in st.session_state:
-    st.session_state.appointments = load_data()
+    st.session_state.appointments = []
 
-st.set_page_config(page_title="H Έξυπνη Ατζέντα μου", layout="wide")
+# --- SIDEBAR: ΞΥΠΝΗΤΗΡΙ & ΜΟΥΣΙΚΗ ---
+st.sidebar.header("⏰ Ξυπνητήρι & Μουσική")
 
-# --- SIDEBAR: ΡΑΔΙΟΦΩΝΟ (TOP 10) ---
-st.sidebar.header("🎵 Ελληνικό Ραδιόφωνο")
-radio_stations = {
-    "ΣΚΑΪ 100.3": "https://skai.live24.gr/skai1003",
-    "Ρυθμός 94.9": "https://rythmos.live24.gr/rythmos949",
-    "Δίεση 101.3": "https://diesi.live24.gr/diesi1013",
-    "Red 96.3": "https://red.live24.gr/red963",
-    "Love Radio 97.5": "https://loveradio.live24.gr/loveradio1000",
-    "Real FM 97.8": "https://realfm.live24.gr/realfm",
-    "Μελωδία 99.2": "https://melodia.live24.gr/melodia992",
-    "Kiss 92.9": "https://kissfm.live24.gr/kiss929",
-    "En Lefko 87.7": "https://enlefko.live24.gr/enlefko877",
-    "Hit 88.9": "https://hit889.live24.gr/hit889"
-}
-radio_choice = st.sidebar.selectbox("Επίλεξε σταθμό:", list(radio_stations.keys()))
-st.sidebar.audio(radio_stations[radio_choice])
+alarm_type = st.sidebar.radio("Τύπος Ειδοποίησης:", ["Συγκεκριμένη Ώρα", "Αντίστροφη Μέτρηση (Timer)"])
 
-# --- ΚΥΡΙΩΣ ΠΑΝΕΛ ---
+if alarm_type == "Συγκεκριμένη Ώρα":
+    alarm_time = st.sidebar.time_input("Ρύθμιση ώρας ξυπνητηριού:", datetime.time(7, 0))
+else:
+    minutes = st.sidebar.number_input("Λεπτά για αντίστροφη μέτρηση:", min_value=1, max_value=120, value=15)
+    if st.sidebar.button("Έναρξη Timer"):
+        st.sidebar.write(f"Ο Timer ξεκίνησε για {minutes} λεπτά!")
+        # Εδώ μπορεί να προστεθεί logic για πραγματικό countdown
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎵 Επιλογή Ήχου")
+media_source = st.sidebar.selectbox("Πηγή Ήχου:", ["YouTube Link", "Ραδιοφωνικός Σταθμός"])
+
+if media_source == "YouTube Link":
+    yt_url = st.sidebar.text_input("Επικόλλησε το YouTube Link:", "https://www.youtube.com/watch?v=SSuCyZlksrI")
+    if yt_url:
+        st.sidebar.video(yt_url)
+else:
+    radio_stations = {
+        "ΣΚΑΪ 100.3": "https://skai.live24.gr/skai1003",
+        "Love Radio 97.5": "https://loveradio.live24.gr/loveradio1000",
+        "Red 96.3": "https://red.live24.gr/red963"
+    }
+    choice = st.sidebar.selectbox("Επίλεξε σταθμό:", list(radio_stations.keys()))
+    st.sidebar.audio(radio_stations[choice])
+
+# --- ΚΥΡΙΩΣ ΠΑΝΕΛ: ΡΑΝΤΕΒΟΥ ΜΕ ΤΟΠΟΘΕΣΙΑ ---
+st.title("📅 Διαχείριση Ραντεβού")
+
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.title("📅 Dashboard Ατζέντας")
-    
-    # Φόρμα Καταχώρησης
-    with st.expander("➕ Νέο Ραντεβού / Ειδοποίηση στο Κινητό", expanded=True):
-        with st.form("appt_form", clear_on_submit=True):
+    with st.expander("➕ Καταχώρηση Ραντεβού με Τοποθεσία", expanded=True):
+        with st.form("appointment_form", clear_on_submit=True):
             title = st.text_input("Τίτλος Ραντεβού")
-            date = st.date_input("Ημερομηνία", datetime.date.today())
-            t_time = st.time_input("Ώρα", datetime.time(12, 0))
+            loc = st.text_input("Τοποθεσία (π.χ. Δήμος Πέλλας ή Διεύθυνση)")
+            date = st.date_input("Ημερομηνία")
+            t_time = st.time_input("Ώρα")
             
-            st.markdown("---")
-            st.subheader("🔔 Ρυθμίσεις Ειδοποίησης")
-            reminder_min = st.slider("Πόσα λεπτά πριν να έρθει το Pop-up στο κινητό;", 5, 120, 15)
-            notif_type = st.multiselect("Τρόπος ειδοποίησης:", ["Google Calendar (Pop-up)", "SMS", "Email"], default=["Google Calendar (Pop-up)"])
-            
-            submit = st.form_submit_button("Αποθήκευση & Συγχρονισμός")
+            submit = st.form_submit_button("Αποθήκευση")
             
             if submit:
-                new_entry = {
-                    "Τίτλος": title, 
-                    "Ημερομηνία": str(date), 
+                # Δημιουργία Google Maps Link
+                maps_link = f"https://www.google.com/maps/search/?api=1&query={loc.replace(' ', '+')}"
+                st.session_state.appointments.append({
+                    "Ραντεβού": title,
+                    "Τοποθεσία": loc,
+                    "Ημερομηνία": str(date),
                     "Ώρα": t_time.strftime("%H:%M"),
-                    "Ειδοποίηση": f"{reminder_min} min πριν",
-                    "Status": "Εκκρεμεί συγχρονισμός"
-                }
-                st.session_state.appointments.append(new_entry)
-                save_data(st.session_state.appointments)
-                st.success(f"Το ραντεβού '{title}' αποθηκεύτηκε! Έτοιμο για συγχρονισμό με το Google Calendar.")
+                    "Χάρτης": maps_link
+                })
+                st.success("Το ραντεβού αποθηκεύτηκε!")
 
-    # Εμφάνιση Πίνακα
+    # Εμφάνιση Πίνακα Ραντεβού
     if st.session_state.appointments:
-        st.subheader("Προσεχή Ραντεβού")
+        st.subheader("Η Λίστα μου")
         df = pd.DataFrame(st.session_state.appointments)
-        st.dataframe(df, use_container_width=True)
-        if st.button("Διαγραφή Όλων"):
-            save_data([])
-            st.rerun()
+        
+        # Μετατροπή του Link σε clickable μορφή για το Streamlit
+        st.write("Κάντε κλικ στο link της τοποθεσίας για οδηγίες στο Google Maps:")
+        for index, row in df.iterrows():
+            st.markdown(f"📍 **{row['Ραντεβού']}** | {row['Ημερομηνία']} {row['Ώρα']} | [Οδηγίες Χάρτη]({row['Χάρτης']})")
+    else:
+        st.info("Δεν υπάρχουν προγραμματισμένα ραντεβού.")
 
 with col2:
-    st.markdown(f"### ⏰ {datetime.datetime.now().strftime('%H:%M')}")
-    st.write(f"**{datetime.datetime.now().strftime('%A, %d %B %Y')}**")
-    
-    st.markdown("---")
-    st.markdown("### 📰 Ροή Ειδήσεων (Live)")
-    feed_url = "https://www.protothema.gr/rss/general/"
-    try:
-        feed = feedparser.parse(feed_url)
-        news_titles = "  •  ".join([post.title for post in feed.entries[:10]])
-    except:
-        news_titles = "Αδυναμία φόρτωσης ειδήσεων..."
-        
-    st.markdown(f"""
-        <div style="background-color: #0e1117; padding: 15px; border: 1px solid #31333f; border-radius: 10px;">
-            <marquee style="color: #ff4b4b; font-family: 'Courier New'; font-size: 18px; font-weight: bold;">
-                {news_titles}
-            </marquee>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    st.info("💡 **Σημείωση:** Για να έρθει το SMS και το Pop-up στο κινητό, πρέπει να ολοκληρώσουμε το Βήμα 2 (Google Cloud).")
+    st.subheader("📰 Ειδήσεις")
+    feed = feedparser.parse("https://www.protothema.gr/rss/general/")
+    titles = "  •  ".join([post.title for post in feed.entries[:8]])
+    st.markdown(f"<div style='background:black;padding:10px'><marquee style='color:red'>{titles}</marquee></div>", unsafe_allow_html=True)
