@@ -7,6 +7,7 @@ import pickle
 import time
 import base64
 from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 
 # --- ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
@@ -15,7 +16,7 @@ st.set_page_config(page_title="Smart Dashboard Pro", layout="wide", page_icon="�
 # --- ΣΥΝΔΕΣΗ ΜΕ GOOGLE CALENDAR ---
 def get_calendar_service():
     creds = None
-    # 1. Προσπάθεια ανάγνωσης από τα Secrets (αν τα έχεις ήδη φτιάξει)
+    # 1. Προσπάθεια ανάγνωσης από τα Secrets
     if "GOOGLE_TOKEN_BASE64" in st.secrets:
         try:
             token_data = base64.b64decode(st.secrets["GOOGLE_TOKEN_BASE64"])
@@ -71,10 +72,6 @@ with st.sidebar:
         "Ελληνικά Media": {
             "Η Καθημερινή": "https://www.kathimerini.gr/rss",
             "ΕΡΤ News": "https://www.ertnews.gr/feed/"
-        },
-        "Οικονομία": {
-            "Capital.gr": "https://www.capital.gr/rss",
-            "Reuters Business": "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best"
         }
     }
     cat_choice = st.selectbox("Κατηγορία:", list(categories.keys()))
@@ -118,18 +115,39 @@ with col2:
     st.subheader(f"🗞️ {feed_choice}")
     try:
         feed = feedparser.parse(feed_url)
-        for post in feed.entries[:8]:
+        for post in feed.entries[:5]:
             st.markdown(f"🔹 **[{post.title}]({post.link})**")
             st.divider()
     except: st.error("Σφάλμα ειδήσεων.")
 
-# --- ΟΙ 5 ΓΡΑΜΜΕΣ ΓΙΑ ΤΟΝ ΚΩΔΙΚΟ SECRETS ---
+# --- ΕΙΔΙΚΟΣ ΕΛΕΓΧΟΣ ΓΙΑ ΤΟ TOKEN SECRETS ---
 st.write("---")
+st.subheader("🛠️ Εργαλείο Σύνδεσης (Secrets)")
+
 if os.path.exists('token.pickle'):
     with open('token.pickle', 'rb') as f:
+        st.success("✅ Το αρχείο βρέθηκε!")
         st.write("### ⬇️ ΑΝΤΙΓΡΑΨΕ ΤΟΝ ΠΑΡΑΚΑΤΩ ΚΩΔΙΚΟ ΓΙΑ ΤΑ SECRETS:")
         st.code(base64.b64encode(f.read()).decode())
+else:
+    st.error("❌ Το αρχείο 'token.pickle' ΔΕΝ υπάρχει.")
+    if os.path.exists('credentials.json'):
+        flow = Flow.from_client_secrets_file(
+            'credentials.json',
+            scopes=['https://www.googleapis.com/auth/calendar'],
+            redirect_uri='urn:ietf:wg:oauth:2.0:oob'
+        )
+        auth_url, _ = flow.authorization_url(prompt='consent')
+        st.markdown(f"**1. [🔗 Πάτα εδώ για έγκριση στη Google]({auth_url})**")
+        new_code = st.text_input("2. Επικόλλησε τον κωδικό που θα σου δώσει η Google:")
+        if new_code:
+            flow.fetch_token(code=new_code)
+            with open('token.pickle', 'wb') as f:
+                pickle.dump(flow.credentials, f)
+            st.success("✅ Το token δημιουργήθηκε! Κάνε ανανέωση τη σελίδα.")
+    else:
+        st.error("Λείπει το credentials.json από το GitHub!")
 
-# Ανανέωση κάθε 10 δευτερόλεπτα
-time.sleep(10)
+# Ανανέωση κάθε 15 δευτερόλεπτα
+time.sleep(15)
 st.rerun()
