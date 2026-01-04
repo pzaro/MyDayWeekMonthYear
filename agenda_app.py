@@ -5,32 +5,35 @@ import feedparser
 import os.path
 import pickle
 import time
+import base64
 from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 
 # --- ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
 st.set_page_config(page_title="Smart Dashboard Pro", layout="wide", page_icon="🏛️")
 
-# --- ΣΥΝΔΕΣΗ ΜΕ GOOGLE CALENDAR ---
+# --- ΑΥΤΟΜΑΤΟΠΟΙΗΜΕΝΗ ΣΥΝΔΕΣΗ ΜΕ GOOGLE CALENDAR (ΜΕΣΩ SECRETS) ---
 def get_calendar_service():
     creds = None
-    # Αναζήτηση για το αρχείο token.pickle
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
+    # Διάβασμα του κλειδιού από τα Secrets (δεν χρειάζεται αρχείο token.pickle)
+    if "GOOGLE_TOKEN_BASE64" in st.secrets:
+        try:
+            token_data = base64.b64decode(st.secrets["GOOGLE_TOKEN_BASE64"])
+            creds = pickle.loads(token_data)
+        except Exception as e:
+            st.sidebar.error(f"Σφάλμα ανάγνωσης Secrets: {e}")
+            return None
     
-    # Αν δεν υπάρχουν έγκυρα διαπιστευτήρια, προσπάθεια ανανέωσης
+    # Αν το token έχει λήξει, το ανανεώνει αυτόματα στο παρασκήνιο
     if creds and creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
-            with open('token.pickle', 'wb') as token:
-                pickle.dump(creds, token)
         except:
             creds = None
             
     if not creds or not creds.valid:
-        return None # Επιστρέφει None αν χρειάζεται νέα έγκριση από το Sidebar
+        st.sidebar.error("❌ Η σύνδεση Google δεν είναι έγκυρη. Ελέγξτε τα Secrets.")
+        return None
         
     return build('calendar', 'v3', credentials=creds)
 
@@ -54,28 +57,6 @@ if 'alarms' not in st.session_state: st.session_state.alarms = []
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.header("🔐 Σύνδεση Google")
-    if not os.path.exists('token.pickle'):
-        if os.path.exists('credentials.json'):
-            flow = Flow.from_client_secrets_file(
-                'credentials.json',
-                scopes=['https://www.googleapis.com/auth/calendar'],
-                redirect_uri='urn:ietf:wg:oauth:2.0:oob'
-            )
-            auth_url, _ = flow.authorization_url(prompt='consent')
-            st.warning("Απαιτείται σύνδεση!")
-            st.markdown(f"[🔗 Πάτα εδώ για Έγκριση]({auth_url})")
-            auth_code = st.sidebar.text_input("Επικόλλησε τον κωδικό εδώ:")
-            if auth_code:
-                flow.fetch_token(code=auth_code)
-                with open('token.pickle', 'wb') as f:
-                    pickle.dump(flow.credentials, f)
-                st.success("✅ Συνδέθηκες! Κάνε Refresh.")
-                st.rerun()
-        else:
-            st.error("Λείπει το credentials.json!")
-
-    st.markdown("---")
     st.header("📻 Ραδιόφωνο")
     radio_stations = {
         "ΕΡΤ (Πρώτο)": "https://ertradio.secure.footprint.net/atunw/radio/ert_proto/playlist.m3u8",
@@ -94,7 +75,6 @@ with st.sidebar:
         "Πολιτική (Διεθνής)": {
             "POLITICO Europe": "https://www.politico.eu/feed",
             "RealClearPolitics": "https://www.realclearpolitics.com/index.xml",
-            "The Nation": "https://www.thenation.com/subject/politics/feed",
             "The Hill": "https://thehill.com/homenews/feed"
         },
         "Ελληνικά Media": {
@@ -118,7 +98,6 @@ with st.sidebar:
     al_time = st.time_input("Ώρα αφύπνισης:", datetime.time(8, 0))
     if st.button("🔔 Ορισμός"):
         st.session_state.alarms.append(al_time.strftime("%H:%M"))
-        st.success(f"Ξυπνητήρι στις {al_time.strftime('%H:%M')}")
     if st.session_state.alarms:
         for i, a in enumerate(st.session_state.alarms):
             col_a, col_b = st.columns([0.8, 0.2])
@@ -131,10 +110,7 @@ with st.sidebar:
 now = datetime.datetime.now()
 curr_time_str = now.strftime("%H:%M")
 
-# Έλεγχος Alarms
-alarm_html = ""
-if curr_time_str in st.session_state.alarms:
-    alarm_html = f'<div class="alarm-msg">🔔 ΞΥΠΝΗΤΗΡΙ: {curr_time_str}! 🔔</div>'
+alarm_html = f'<div class="alarm-msg">🔔 ΞΥΠΝΗΤΗΡΙ: {curr_time_str}! 🔔</div>' if curr_time_str in st.session_state.alarms else ""
 
 st.markdown(f"""
     <div class="clock-container">
@@ -147,13 +123,13 @@ st.markdown(f"""
 c1, c2 = st.columns([1.5, 1])
 
 with c1:
-    st.subheader("🗓️ Προσθήκη στο Google Calendar")
+    st.subheader("🗓️ Google Calendar")
     with st.form("google_cal_form", clear_on_submit=True):
         title = st.text_input("Τίτλος Ραντεβού")
         loc = st.text_input("Τοποθεσία")
         d_val = st.date_input("Ημερομηνία", datetime.date.today())
         t_val = st.time_input("Ώρα", datetime.time(9, 0))
-        if st.form_submit_button("✅ Αποστολή στο Ημερολόγιο"):
+        if st.form_submit_button("✅ Αποθήκευση"):
             service = get_calendar_service()
             if service:
                 start = datetime.datetime.combine(d_val, t_val)
@@ -165,18 +141,16 @@ with c1:
                     'reminders': {'useDefault': True},
                 }
                 service.events().insert(calendarId='primary', body=event).execute()
-                st.success(f"Επιτυχία! Το '{title}' στάλθηκε στο κινητό σου.")
+                st.success(f"Επιτυχία! Το '{title}' προστέθηκε στο Google Calendar.")
             else:
-                st.error("Πρέπει πρώτα να κάνεις τη σύνδεση στο Sidebar!")
+                st.error("Σφάλμα σύνδεσης Google. Ελέγξτε τα Secrets.")
 
 with c2:
     st.subheader(f"🗞️ {feed_choice}")
     try:
         feed = feedparser.parse(feed_url)
-        # News Ticker
         titles = "  •  ".join([p.title for p in feed.entries[:10]])
         st.markdown(f'<div style="background:#000;padding:10px;border:1px solid #00d4ff;"><marquee style="color:#00ff00;">{titles}</marquee></div>', unsafe_allow_html=True)
-        # List
         for post in feed.entries[:10]:
             st.markdown(f"🔹 **[{post.title}]({post.link})**")
             st.divider()
