@@ -43,28 +43,53 @@ with st.sidebar:
         "RADIO THESSALONIKI 94.5": "https://rthes.live24.gr/rthes",
         "COSMORADIO 95.9": "https://cosmoradio.live24.gr/cosmo959",
         "LOVE RADIO 97.5": "https://loveradio.live24.gr/loveradio1000",
-        "KISS FM 92.9": "https://kissfm.live24.gr/kiss929",
         "METROPOLIS 95.5": "https://metropolis.live24.gr/metropolis955"
     }
     selected_r = st.selectbox("Επίλεξε σταθμό:", list(radio_stations.keys()))
-    # Προσθήκη info για το Play
-    st.info("⚠️ Πατήστε το Play δύο φορές αν κολλήσει λόγω browser.")
     st.audio(radio_stations[selected_r], format="audio/mp3")
 
     st.markdown("---")
-    st.header("📰 Πηγές Ειδήσεων (RSS)")
-    news_sources = {
-        "Reuters World": "https://www.reutersagency.com/feed/?best-topics=world-news&post_type=best",
-        "AP News": "https://purl.org/atom/1.0/topstories",
-        "Euronews": "https://www.euronews.com/rss?level=vertical&name=news",
-        "France24": "https://www.france24.com/en/rss",
-        "Η Καθημερινή": "https://www.kathimerini.gr/rss",
-        "eKathimerini (EN)": "https://www.ekathimerini.com/feed/",
-        "ΤΑ ΝΕΑ": "https://www.tanea.gr/feed/",
-        "Newsbeast": "https://www.newsbeast.gr/feed",
-        "Ελληνικό Κοινοβούλιο": "https://www.hellenicparliament.gr/rss"
+    st.header("📰 News Feed")
+    
+    # ΟΡΓΑΝΩΣΗ ΤΩΝ ΠΗΓΩΝ ΣΟΥ ΣΕ ΚΑΤΗΓΟΡΙΕΣ
+    categories = {
+        "Διεθνή Ειδησεογραφικά": {
+            "Reuters - All News": "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best",
+            "ABC News Top Stories": "http://feeds.abcnews.com/abcnews/topstories",
+            "BBC News World": "https://feeds.bbci.co.uk/news/world/rss.xml",
+            "Euronews": "https://www.euronews.com/rss?level=vertical&name=news",
+            "France24": "https://www.france24.com/en/rss",
+            "Aljazeera": "https://www.aljazeera.com/xml/rss/all.xml"
+        },
+        "Ελληνικά Media": {
+            "Η Καθημερινή": "https://www.kathimerini.gr/rss",
+            "eKathimerini (English)": "https://www.ekathimerini.com/feed/",
+            "ΤΑ ΝΕΑ": "https://www.tanea.gr/feed/",
+            "Ναυτεμπορική": "https://www.naftemporiki.gr/feed/",
+            "ΕΡΤ News": "https://www.ertnews.gr/feed/",
+            "Newsbeast": "https://www.newsbeast.gr/feed",
+            "Ελληνικό Κοινοβούλιο": "https://www.hellenicparliament.gr/rss"
+        },
+        "Τεχνολογία & Επιστήμη": {
+            "ArsTechnica": "https://feeds.arstechnica.com/arstechnica/index",
+            "Wired Science": "https://www.wired.com/feed/category/science/latest/rss",
+            "Popular Science": "https://www.popsci.com/feed",
+            "NASA Image of the Day": "https://www.nasa.gov/rss/dyn/lg_image_of_the_day.rss",
+            "Science Daily": "https://www.sciencedaily.com/rss/all.xml",
+            "9to5Linux": "https://9to5linux.com/category/news/feed"
+        },
+        "Gaming & Hobby": {
+            "IGN All": "https://feeds.feedburner.com/ign/all",
+            "Eurogamer": "https://www.eurogamer.net/feed",
+            "Polygon": "https://www.polygon.com/rss/index.xml",
+            "3D Printing News": "https://3dprinting.com/feed",
+            "Warhammer Community": "https://warhammer-community.com/feed"
+        }
     }
-    selected_news = st.selectbox("Επιλογή:", list(news_sources.keys()))
+    
+    cat_choice = st.selectbox("Κατηγορία:", list(categories.keys()))
+    feed_choice = st.selectbox("Πηγή:", list(categories[cat_choice].keys()))
+    feed_url = categories[cat_choice][feed_choice]
 
     st.markdown("---")
     st.header("⏰ Αφύπνιση / Timer")
@@ -83,7 +108,7 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     st.subheader("📝 Πρόγραμμα")
-    with st.expander("➕ Νέα Καταχώρηση", expanded=True):
+    with st.expander("➕ Νέα Καταχώρηση", expanded=False):
         with st.form("appt_form", clear_on_submit=True):
             t = st.text_input("Τίτλος"); l = st.text_input("Τοποθεσία")
             d = st.date_input("Ημερομηνία"); tm = st.time_input("Ώρα")
@@ -101,15 +126,19 @@ with col1:
         if c2.button("🗑️", key=f"d_{i}"): st.session_state.appointments.pop(i); st.rerun()
 
 with col2:
-    st.subheader("🔥 Live Ticker")
+    st.subheader(f"🔥 {feed_choice}")
     try:
-        feed = feedparser.parse(news_sources[selected_news])
-        titles = "  •  ".join([post.title for post in feed.entries[:15]])
-        st.markdown(f"""
-            <div style="background:#000; padding:10px; border-left:5px solid #ff4b4b; border-radius:5px;">
-                <marquee color="#00ff00" font-size="18px" font-weight="bold">{titles}</marquee>
-            </div>
-            """, unsafe_allow_html=True)
-        for post in feed.entries[:6]:
-            st.markdown(f"🔹 <a href='{post.link}' style='color:#00d4ff; text-decoration:none;'>{post.title}</a>", unsafe_allow_html=True)
-    except: st.error("Σφάλμα σύνδεσης ειδήσεων.")
+        feed = feedparser.parse(feed_url)
+        if feed.entries:
+            titles = "  •  ".join([post.title for post in feed.entries[:15]])
+            st.markdown(f"""
+                <div style="background:#000; padding:10px; border-left:5px solid #ff4b4b; border-radius:5px;">
+                    <marquee color="#00ff00" font-size="18px" font-weight="bold">{titles}</marquee>
+                </div>
+                """, unsafe_allow_html=True)
+            for post in feed.entries[:8]:
+                st.markdown(f"🔹 <a href='{post.link}' target='_blank' style='color:#00d4ff; text-decoration:none; font-size:14px;'>{post.title}</a>", unsafe_allow_html=True)
+        else:
+            st.warning("Δεν βρέθηκαν δεδομένα για αυτή την πηγή.")
+    except Exception as e:
+        st.error(f"Σφάλμα σύνδεσης: {e}")
