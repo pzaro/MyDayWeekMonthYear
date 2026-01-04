@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import datetime
 import feedparser
-import time
 
 # --- ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
 st.set_page_config(page_title="Smart Dashboard Pro", layout="wide", page_icon="⚡")
@@ -22,7 +21,6 @@ st.markdown("""
     }
     .time-box { color: #00ff00; font-size: 60px; font-weight: bold; text-shadow: 0 0 15px #00ff00; line-height: 1; }
     .date-box { color: #00d4ff; font-size: 25px; font-weight: bold; margin-top: 15px; border-top: 1px solid #444; padding-top: 10px; }
-    .stAudio { margin-top: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -39,39 +37,48 @@ st.markdown(f"""
     </div>
     """, unsafe_allow_html=True)
 
-# --- SIDEBAR: ΡΑΔΙΟΦΩΝΟ, NEWS FEED & ΞΥΠΝΗΤΗΡΙ ---
+# --- SIDEBAR: ΡΑΔΙΟΦΩΝΟ & ΡΥΘΜΙΣΕΙΣ ---
 with st.sidebar:
-    st.header("📻 Live Radio")
+    st.header("📻 Ζωντανό Ραδιόφωνο")
+    
     radio_stations = {
         "ΕΡΤ (Πρώτο Πρόγραμμα)": "https://ert-proto.live24.gr/ert_proto",
         "ERT News 105.8": "https://ert-news.live24.gr/ert_news",
+        "ERA Sport": "https://ert-erasport.live24.gr/ert_erasport",
+        "PARAPOLITIKA 90.1": "https://parapolitika.live24.gr/parapolitika901",
         "REAL NEWS 97.8": "https://realfm.live24.gr/realfm",
         "RADIO THESSALONIKI 94.5": "https://rthes.live24.gr/rthes",
         "COSMORADIO 95.9": "https://cosmoradio.live24.gr/cosmo959",
+        "VELVET 96.8": "https://velvet968.live24.gr/velvet968",
         "LOVE RADIO 97.5": "https://loveradio.live24.gr/loveradio1000",
         "KISS FM 92.9": "https://kissfm.live24.gr/kiss929",
         "METROPOLIS 95.5": "https://metropolis.live24.gr/metropolis955",
-        "VELVET 96.8": "https://velvet968.live24.gr/velvet968",
-        "ZOO RADIO 90.8": "https://zooradio.live24.gr/zoo908"
+        "ZOO RADIO 90.8": "https://zooradio.live24.gr/zoo908",
+        "LIBERO 101.7": "https://libero.live24.gr/libero1017",
+        "PEPPER 96.6": "https://pepper966.live24.gr/pepper966"
     }
-    selected_r = st.selectbox("Επιλογή Σταθμού:", list(radio_stations.keys()))
-    st.audio(radio_stations[selected_r])
+    
+    selected_r = st.selectbox("Επίλεξε σταθμό:", list(radio_stations.keys()))
+    
+    # Ο Player παίζει πάντα τον επιλεγμένο σταθμό
+    st.audio(radio_stations[selected_r], format="audio/mp3", key="radio_player")
+    st.caption("💡 Πατήστε το Play για να ξεκινήσει η ροή.")
 
     st.markdown("---")
-    st.header("📰 News Feed")
+    st.header("📰 Πηγή Ειδήσεων")
     news_sources = {
         "Ναυτεμπορική": "https://www.naftemporiki.gr/feed/",
-        "Reuters": "https://www.reutersagency.com/feed/?best-topics=world-news&post_type=best",
         "ΕΡΤ News": "https://www.ertnews.gr/feed/",
+        "Reuters": "https://www.reutersagency.com/feed/?best-topics=world-news&post_type=best",
         "Capital.gr": "https://www.capital.gr/rss",
         "BBC News": "http://feeds.bbci.co.uk/news/rss.xml"
     }
-    selected_news_source = st.selectbox("Επίλεξε Πηγή Ειδήσεων:", list(news_sources.keys()))
+    selected_news_source = st.selectbox("Επιλογή:", list(news_sources.keys()))
 
     st.markdown("---")
     st.header("⏰ Ξυπνητήρι")
-    new_alarm = st.time_input("Ώρα αφύπνισης:", datetime.time(8, 0))
-    if st.button("🔔 Ορισμός"):
+    new_alarm = st.time_input("Ώρα:", datetime.time(8, 0))
+    if st.button("🔔 Προσθήκη"):
         st.session_state.alarms.append(new_alarm.strftime('%H:%M'))
         st.rerun()
     
@@ -86,8 +93,8 @@ with st.sidebar:
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.subheader("📝 Πρόγραμμα & Ραντεβού")
-    with st.expander("➕ Προσθήκη Καταχώρησης", expanded=True):
+    st.subheader("📝 Το Πρόγραμμά μου")
+    with st.expander("➕ Προσθήκη Νέου Ραντεβού", expanded=True):
         with st.form("appt_form", clear_on_submit=True):
             title = st.text_input("Τίτλος")
             loc = st.text_input("Τοποθεσία")
@@ -103,7 +110,6 @@ with col1:
                 st.rerun()
 
     if st.session_state.appointments:
-        st.write("---")
         for i, a in enumerate(st.session_state.appointments):
             with st.container():
                 c1, c2 = st.columns([5, 1])
@@ -114,11 +120,11 @@ with col1:
                 st.markdown("---")
 
 with col2:
-    st.subheader("🔥 Breaking News")
+    st.subheader("🔥 Ροή Ειδήσεων")
     try:
         feed = feedparser.parse(news_sources[selected_news_source])
         if feed.entries:
-            titles = "  •  ".join([post.title for post in feed.entries[:15]])
+            titles = "  •  ".join([post.title for post in feed.entries[:12]])
             st.markdown(f"""
                 <div style="background:#000; padding:10px; border-left:5px solid #ff4b4b; border-radius:5px;">
                     <marquee color="#00ff00" font-size="18px" font-weight="bold">{titles}</marquee>
@@ -126,8 +132,6 @@ with col2:
                 """, unsafe_allow_html=True)
             st.markdown("---")
             for post in feed.entries[:8]:
-                st.caption(f"🔗 [{post.title}]({post.link})")
-        else:
-            st.write("Δεν βρέθηκαν ειδήσεις.")
+                st.markdown(f"🔹 [{post.title}]({post.link})")
     except:
-        st.error("Σφάλμα στη φόρμα ειδήσεων.")
+        st.error("Σφάλμα σύνδεσης ειδήσεων.")
