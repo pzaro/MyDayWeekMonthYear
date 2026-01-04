@@ -186,3 +186,12 @@ with c2:
 # Auto-refresh για το ρολόι
 time.sleep(10)
 st.rerun()
+import base64
+import os
+
+# Αυτό θα εμφανίσει το κλειδί σου στην οθόνη του Streamlit
+if os.path.exists('token.pickle'):
+    with open('token.pickle', 'rb') as f:
+        encoded = base64.b64encode(f.read()).decode()
+        st.write("### ΑΝΤΙΓΡΑΨΕ ΤΟΝ ΠΑΡΑΚΑΤΩ ΚΩΔΙΚΟ:")
+        st.code(encoded)
