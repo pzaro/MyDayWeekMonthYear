@@ -7,7 +7,7 @@ import time
 # --- ΡΥΘΜΙΣΕΙΣ ΣΕΛΙΔΑΣ ---
 st.set_page_config(page_title="Smart Dashboard Pro", layout="wide", page_icon="⚡")
 
-# Custom CSS για το νέο design
+# Custom CSS για το design
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -29,9 +29,8 @@ st.markdown("""
 # Αρχικοποίηση session states
 if 'appointments' not in st.session_state: st.session_state.appointments = []
 if 'alarms' not in st.session_state: st.session_state.alarms = []
-if 'diet_logs' not in st.session_state: st.session_state.diet_logs = []
 
-# --- ΨΗΛΑ: ΩΡΑ ΚΑΙ ΗΜΕΡΟΜΗΝΙΑ (Η ημερομηνία κάτω από την ώρα) ---
+# --- ΨΗΛΑ: ΩΡΑ ΚΑΙ ΗΜΕΡΟΜΗΝΙΑ ---
 now = datetime.datetime.now()
 st.markdown(f"""
     <div class="clock-container">
@@ -40,10 +39,9 @@ st.markdown(f"""
     </div>
     """, unsafe_allow_html=True)
 
-# --- SIDEBAR: ΡΑΔΙΟΦΩΝΟ & NEWS FEED ---
+# --- SIDEBAR: ΡΑΔΙΟΦΩΝΟ, NEWS FEED & ΞΥΠΝΗΤΗΡΙ ---
 with st.sidebar:
     st.header("📻 Live Radio")
-    st.write("Ακούστε ζωντανά οποιαδήποτε στιγμή:")
     radio_stations = {
         "ΕΡΤ (Πρώτο Πρόγραμμα)": "https://ert-proto.live24.gr/ert_proto",
         "ERT News 105.8": "https://ert-news.live24.gr/ert_news",
@@ -57,16 +55,15 @@ with st.sidebar:
         "ZOO RADIO 90.8": "https://zooradio.live24.gr/zoo908"
     }
     selected_r = st.selectbox("Επιλογή Σταθμού:", list(radio_stations.keys()))
-    st.audio(radio_stations[selected_r]) # Το ραδιόφωνο είναι πάντα διαθέσιμο εδώ
+    st.audio(radio_stations[selected_r])
 
     st.markdown("---")
-    st.header("📰 News Feed (Λειτουργικά)")
-    # Επιλογή πηγών που έχουν επιβεβαιωμένα ενεργό RSS
+    st.header("📰 News Feed")
     news_sources = {
-        "Ναυτεμπορική (Οικονομία)": "https://www.naftemporiki.gr/feed/",
-        "Reuters (World News)": "https://www.reutersagency.com/feed/?best-topics=world-news&post_type=best",
-        "ΕΡΤ News (Επικαιρότητα)": "https://www.ertnews.gr/feed/",
-        "Capital.gr (Επιχειρήσεις)": "https://www.capital.gr/rss",
+        "Ναυτεμπορική": "https://www.naftemporiki.gr/feed/",
+        "Reuters": "https://www.reutersagency.com/feed/?best-topics=world-news&post_type=best",
+        "ΕΡΤ News": "https://www.ertnews.gr/feed/",
+        "Capital.gr": "https://www.capital.gr/rss",
         "BBC News": "http://feeds.bbci.co.uk/news/rss.xml"
     }
     selected_news_source = st.selectbox("Επίλεξε Πηγή Ειδήσεων:", list(news_sources.keys()))
@@ -90,7 +87,7 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     st.subheader("📝 Πρόγραμμα & Ραντεβού")
-    with st.expander("➕ Προσθήκη Καταχώρησης", expanded=False):
+    with st.expander("➕ Προσθήκη Καταχώρησης", expanded=True):
         with st.form("appt_form", clear_on_submit=True):
             title = st.text_input("Τίτλος")
             loc = st.text_input("Τοποθεσία")
@@ -106,6 +103,7 @@ with col1:
                 st.rerun()
 
     if st.session_state.appointments:
+        st.write("---")
         for i, a in enumerate(st.session_state.appointments):
             with st.container():
                 c1, c2 = st.columns([5, 1])
@@ -116,36 +114,20 @@ with col1:
                 st.markdown("---")
 
 with col2:
-    # News Ticker με την επιλεγμένη πηγή
     st.subheader("🔥 Breaking News")
     try:
         feed = feedparser.parse(news_sources[selected_news_source])
         if feed.entries:
-            titles = "  •  ".join([post.title for post in feed.entries[:12]])
+            titles = "  •  ".join([post.title for post in feed.entries[:15]])
             st.markdown(f"""
                 <div style="background:#000; padding:10px; border-left:5px solid #ff4b4b; border-radius:5px;">
                     <marquee color="#00ff00" font-size="18px" font-weight="bold">{titles}</marquee>
                 </div>
                 """, unsafe_allow_html=True)
-            for post in feed.entries[:5]:
+            st.markdown("---")
+            for post in feed.entries[:8]:
                 st.caption(f"🔗 [{post.title}]({post.link})")
         else:
             st.write("Δεν βρέθηκαν ειδήσεις.")
     except:
         st.error("Σφάλμα στη φόρμα ειδήσεων.")
-
-    st.markdown("---")
-    st.subheader("🥗 Έξοδα & Δίαιτα")
-    with st.form("diet"):
-        meal = st.text_input("Γεύμα")
-        cost = st.number_input("Ευρώ (€)", min_value=0.0)
-        if st.form_submit_button("Καταγραφή"):
-            st.session_state.diet_logs.append({"Γεύμα": meal, "Κόστος": cost})
-            st.rerun()
-    
-    if st.session_state.diet_logs:
-        df_diet = pd.DataFrame(st.session_state.diet_logs)
-        st.write(f"**Σύνολο:** {df_diet['Κόστος'].sum():.2f} €")
-        if st.button("Καθαρισμός"):
-            st.session_state.diet_logs = []
-            st.rerun()
